@@ -1,0 +1,2390 @@
+---
+title: "Lassoing Data"
+author: "Coursera Course by John Hopkins University"
+date: "INSTRUCTORS: Dr. Jeff Leek, Dr. Roger D. Peng, Dr. Brian Caffo"
+fontsize: 11pt
+output: 
+        pdf_document:
+                toc: true
+                toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Intro  
+*One of the major components of a data scientist's job is to collect and clean data. Whether at a small organization or a major enterprise, the first step in using data is getting, cleaning and understanding the data. In this course, we focus on R packages and a few outside tools that can be used to collect data from a variety of sources, from Excel files to databases like MySQL. We will also cover a variety of formats including JSON, XML, and flat files (.csv, .txt).*  
+  
+*The emphasis of this course is on creating tidy data sets that can be used in downstream analyses*
+
+
+# Finding Data and Reading Various File Types  
+## Obtaining Data Motivation  
+        * This course covers the "nitty gritty" of getting data ready for analysis
+                + finding where the data are and extracting it out.  
+                + Tidy data principles and how to make data tiny  
+                + Practical implementation through a range of R packages  
+        * Data often is not nicely in a `.csv`, but rather 
+                + parsed in a text file and needs to be processed
+                + formatted in `JSON` format  
+                + Free text instructions where a phrase is to be extracted
+                + In data bases like `mySQL` ("My Sequel") or `MongoDB` (Mon-go D-B)
+        * Where are data?
+                + Websites  
+                        - **[Online Datasets](data.baltimorecity.gov)**
+                + APIs  
+        * Steps for going from *Raw data* to *data communication*  
+        **Raw data -> Processing script -> tidy data** -> data analysis -> data communication  
+                +This course focuses on going from Raw data to Tidy data
+
+## Raw and Processed Data  
+* **Data** - Values of qualitative or quantitative variables, belonging to a set of items.
+        + **Qualitative**: Country of orgin, sex, treatment.  
+        + **Quantitative**: Height, weight, blood pressure
+        
+* **Raw Data**
+        + The orginal source of the data
+        + Often hard to use for data analyses  
+        + Data analysis *includes* processing  
+        + Raw data may only need to be processed once
+
+* **Processed data**
+        + Data that is ready for analysis  
+        + Processing can include merging, subsetting, transforming, etc.  
+        + There may be standards for how it's processed  
+        + All steps and actions taken should be recorded  
+        
+* Raw Data could be considered in several layers.
+        + If processing genomes 
+                - the og picture in the machine is the raw data,
+                - the image is evaluated to determine the prodominet color, this could be considered raw data.  
+                - The machine then outputs a text file of these readings, this also is raw data that you would now need to proccess further past the machine.
+        + The journey this data takes is to be mentioned as to not ignore the orgin of the true raw data
+
+## Components of Tidy Data  
+1. The raw data  
+2. A tidy data set  
+3. A code book describing each variable and its values in the tidy data set.  
+4. An explicit and exact recipe you used to go from 1 -> 2, 3... (This will be the R scripts you write)
+
+* When looking at a particular data set, the *raw data* is the rawest form of the data you have access to.
+        + Examples:
+                - The binary file your measurement machine spits out  
+                - The unformatted Excel file with 10 worksheets the company you contracted with sent you  
+                - The complicated JSON data you got from scraping the Twitter API  
+                - The hand-entered numbers you collected looking through a microscope  
+        + You know the raw data is in the right format if you
+                - You ran no software on the data  
+                - Did not manipulate any of the numbers in the data  
+                - You did not remove any data from the data set  
+                - You did not summarize the data in any way  
+                
+* The tidy Data
+1) Each variable you measure should be in one column  
+2) Each different observation of that variable should be in a different row  
+3) There should be one table for each "kind" of variable  
+4) If you have multiple tables, they should include a column in the table that allows them to be linked  
+        
+        + *Some other tips*  
+                - Include a row at the top of each file with variable names.  
+                - Make variable names human readable; `AgeAtDiagnosis` instead of `AgeDx`  
+                - In general data should eb saved in one file per table.
+        
+* The Code Book
+        + Information about the variables (including units!) int he data set not contained in the tidy data  
+        + Information about the summary choices you made  
+        + Information about the experimental study design you used  
+          
+        + *Some other tips*  
+                - A common format for this document is a Word/text file (or markdown as thats common in D.S.)
+                - There should be a section called "Study Design" that ahs a thorough description of how you collected the data.
+                - There should be a section called "Code book" that describes each variable and its units.
+
+* The instruction list
+        + Ideally a computer script (in R :-) but I suppose Python is ok too...)  
+        + The input for the script is the raw data  
+        + The output is the processed, tidy data  
+        + There are no parameters to the script  
+
+        + In some cases it will not be possible to script every step. In that case you should procide instructions like:
+                1) Step 1 - take the raw file, run version 3.1.2 of summarize software with parameters a=1, b=2, c=3  
+                2) Step 2 - run the sodtware separately for each sample  
+                3) Step 3 - take column three fo ouputfile.out for each sample and that iss the corresponding row in the output data set  
+
+* Be detailed in how you converted raw to tidy data.
+        + Example: **(A Critique of Reinhard and Rogoff)[http://www.cc.com/video-clips/dcyvro/the-colbert-report-austerity-s-spreadsheet-error]**  
+                
+
+
+## Downloading Files  
+* A basic component of working with data is knowing your working directory  
+    + The two main commands are `getwd()` and `setwd()`.  
+    + Be aware of relative versus absolute paths  
+      - Relative - `setwd("./data")`, `setwd("../")`  
+      - Absolute - `setwd("/Users/jtleek/data/")`  
+    + Important difference in Windows, they us `\` instead of `/`: `setwd("C:\\Users\\Andrew\\Downloads")`  
+* The directory that is **up** from where you are is like the parent folder.  
+  
+* Checking for and creating directories  
+  + `file.exists("directoryName")` will check to see if the directory exists  
+  + `dir.create("directoryName)` will create a new directory called "`directoryName`" if it doesn't exist
+```{r}
+if(!file.exists("data")){
+  dir.create("data")
+}
+```
+  
+* Lassoing "cattle"(data) from the internet: `download.file()`
+  + Downloads a file from the internet  
+  + Even if you could do this by hand, it helps for reproducibility  
+  + Useful for downloading tab-delimited, csv, and other files.
+  + Important parameters are *url*, *destfile*, and *method*  (Source of data, desitnation file, method )
+    + Right click on file you want to dowload, select "*copy link location*" (**(Example with Balimore camera data)[https://data.baltimorecity.gov/Transportation/Baltimore-Fixed_Speed-Cameras/dz54-2aru]**)  
+```{r}
+if(!file.exists("data")){
+  dir.create("data")
+}
+
+fileUrl <- "https://data.baltimorecity.gov/api/views/dz54-2aru/rows.csv?accessType=DOWNLOAD"
+download.file(fileUrl, destfile = "./data/cameras.csv", method = "curl")
+##Because url is https "curl" has to be specified for Mac & Linix
+list.files("./data")
+dateDownloaded <- date()
+dateDownloaded
+```
+  * Additional notes about `download.file()`
+    + If the url starts with *http* you can use `download.file()`  
+    + If the url starts with *https* on Mac of Linix you need to set `method = "curl"`  
+    + If your internet is poor or the file is big, this might take a while  
+    + Be sure to record when you downloaded.  
+
+
+## Reading Local "Flat" Files  
+* Kind of a review from R lectures  
+* Most common way to load local data is `read.table()`
+  + Requires more parameters than some of the other functions
+  + Can be kinda slow, so its a poor mix with big data  
+  + Reads the data straight into RAM - So big data can cause issues  
+  + Important parameters: 
+    - `file` - *Indicates input file*   
+    - `header` - *Logical for if there is a header*   
+    - `sep` - *Character that seperates data, default is a tab*  
+    - `row.names` - *Optional vector of row names*  
+```{r}
+cameraData <- read.table("./data/cameras.csv", sep = ",", header = TRUE)
+head(cameraData)
+```
+  + `read.csv` automatically sets `sep = ","` and `header = TRUE`  
+* Addtional parameters for `read.table()`
+  + `na.strings` - sets the character that represents a missing value  
+  + `nrows` - how many rows to read fo the file (e. g. `nrows = 10` reads in 10 lines)  
+  + `skip` - number of lines to skip befores starting to read  
+  + `quote` - tells R whether there are any quoted values ( "Like This"); `quote=""` indicates there are no quotes
+    - If $`$ or $"$ are placed in data values setting 
+    `quote=""` will often resolve this  
+
+
+
+## Reading Excel Files  
+* Still probably the most widely used format for sharing data  
+```{r}
+if(!file.exists("data")){
+  dir.create("data")
+}
+
+fileUrl <- "https://data.baltimorecity.gov/api/views/dz54-2aru/rows.csv?accessType=DOWNLOAD&bom=true&format=true"
+fileLoc <- paste(getwd(), "/data/cameras.xlsx", sep = "")
+download.file(fileUrl, destfile = fileLoc, method = "curl")
+dateDownloaded <- date()
+#xlsx is an excel file type
+ogDir <- getwd()
+setwd(paste(getwd(), "/data", sep = ""))
+getwd()
+
+#Keep getting error, Abondoned in Place until later
+# library(readxl)
+# cameraData <- read_excel("cameras.xlsx", sheet = 1) #ERROR
+# head(cameraData)
+setwd(ogDir)
+```
+* Parameters:
+  + `sheetIndex` - indicates the sheet to read from
+  + `colIndex` - indicates range of columns to read from  
+  + `rowIndex` - indicates range of rows    to read from  
+
+* Additional notes:
+  + `write.xlsx` function will write out an Excel file  
+  + `read.xlsx2` is much faster than `read.xlsx` but for reading subsets of rows may be slightly unstable.  
+  + The XLConnect package has more options for writing and manipulating Excel files  
+    - XLConnect vignette is a good place to start for that package  
+  + Best to store data in `.csv` or tab separated files(`.tab`/`.txt`) as they're easier to distribute  
+  
+  
+## Reading XML  
+* XML
+  + Extensible mark up language that is frequently used to store structured data  
+  + Widely used in internet applications 
+    - Extracting XML is the basis for most web scraping
+  + Components:
+    - Markup - labels that give the text structure  
+    - Content - the actual text of the document  
+    
+* Tags, elements and attributes  
+  + Tags correspong to general labels
+    - Start tags `<section>`
+    - End tags `</section>`  
+    - Empty tags `<line-break />`  
+  + Elements are specific examples of tags
+    - `<Gretting> Hello, world </Greeting>  
+  + Attributes are componets of the label  
+    - `<img src="jeff.jpg" alt="instructor"/>`
+    - `<step number="3"> Connect A to B. </step>`  
+    
+* **(Example XML file)[http://www.w3schools.com/xml/simple.xml]**  
+  + `<food>` has multiple subclasses, such as `<name>`, `<description>`, ...  
+```{r}
+library(XML)
+library(RCurl)
+fileUrl <- getURL("http://www.w3schools.com/xml/simple.xml")
+#Throwing Error#doc <- xmlTreeParse(fileUrl, useInternalNodes = TRUE) #Parses xml into its useable components
+# rootNode <- xmlRoot(doc) #"Wrapper for entire document"
+# xmlName(rootNode) #Returns name of root
+# names(rootNode)#Returns names of 1st branch from root
+# 
+# #Looking at particular elements of XML
+# rootNode[[1]]#REturns first food element
+# rootNode[[1]][[1]]#Returns First element of First food element
+# 
+# #Extracting parts of the file
+# xmlSApply(rootNode, xmlValue)#Gets xmlValue of each tag under rootNode
+```
+* `XPath` language can let you get specific attributes out of the XML
+  + **(Read More)[http://www.stat.berkeley.edu/~statcur/Workshop2/Presentations/XML.pdf]**
+  + `/node` - Top level node  
+  + `//node` - Node at any level  
+  + `node[@attr-name]` Node with an attribute name  
+  + `node[@attr-name='bob']` - Node with attribute name attr-name='bob'  
+
+```{r}
+# #Get the items on the menu and prices)
+# xpathSApply(rootNode, "//name", xmlValue)#Takes out all elements that are tagged with "name"  
+# xpathSApply(rootNode, "//price", xmlValue)
+```
+
+* Exacting content by attributes from Source Code
+  + Use `htmlTreeParse()` for reading in source code as XML  
+    - Following code has become out of date from the lecture, I tried to update it but it 
+```{r}
+library(XML)
+library(RCurl)
+
+fileUrl <- "https://www.espn.com/nfl/team/_/name/bal/baltimore-ravens"  
+doc <- htmlTreeParse(getURL(fileUrl), useInternalNodes = TRUE)
+scores <- xpathSApply(doc, "//div[@class='score']", xmlValue)
+teams <- xpathSApply (doc, "//div[@class='game-info']", xmlValue)
+scores
+teams
+```
+  
+
+  
+    
+    
+    
+    
+## Reading JSON  
+* JSON
+  + JavaScript Object Notation  
+  + Lightweight data storage  
+  + Common format for data from application programming interfaces (APIs)  
+  + Similar structure to XML but different syntax/format  
+  + Data stored as:
+    - Numbers (double)
+    - Strings (double quoted)
+    - Boolean (true or false)  
+    - Array (ordered, comma separated enclsoed in square brakets[])
+    - Object (unordered, comma separated collection of key:value pairs in curley brackets {})
+  + (Example)[https://api.github.com/users/jtleek/repos]
+```{r}
+library(jsonlite)
+jsonData <- fromJSON("https://api.github.com/users/jtleek/repos")
+names(jsonData) #Displays top level components of data.frame
+names(jsonData$owner)#Goes to owner Data.frame, which is a data.frame itself
+jsonData$owner$login#Leaf of data.frame; (looking at jtleek's depo)
+```
+  
+* Writing data frames to JSON
+```{r}
+myjson <- toJSON(iris, pretty=TRUE)
+cat(myjson) #Display json File
+iris2 <- fromJSON(myjson)
+head(iris2)
+```
+
+
+## The data.table Package  
+
+* data.table
+  + Inherets from data.frame  
+    - All functions that accept data.frame work on data.table  
+  + Written in C so it is much faster  
+  + Much, much faster at subsetting, group, and updating variables
+  + A little bit new syntax  
+```{r}
+library(data.table)
+DF <- data.frame(x=rnorm(9), y=rep(c("a", "b", "c"), each = 3), z = rnorm(9))
+head(DF,3)
+
+DT <- data.table(x=rnorm(9), y=rep(c("a", "b", "c"), each = 3), z = rnorm(9))  
+head(DT,3)
+
+#See all the data tables in memory
+tables
+
+#Subsetting Datat.table
+DT[2,]
+DT[DT$y=="a",]
+
+#If no comma, Data Tables will subset by row
+DT[c(2,3)]
+
+#Subsetting columns doesn't work the same
+DT[,c(2,3)]
+```
+
+* Column subsetting in data.table  
+  + The subsetting sunction is modified for data.table  
+  + The argument you pass after the comma is called an "expression"
+  + In R an expression is a collection of statements enclosed in curley brakets
+```{r}
+{
+  x <- 1
+  y <- 2
+}
+k <- {print(10); 5}
+print(k)
+```
+
+* Calculating calues for variables with expressions
+```{r}
+DT[,list(mean(x), sum(z))] #Returns mean of x values and sum of Z values
+
+DT[,table(y)]
+```
+
+* Adding new columns
+```{r}
+DT[,w:=z^2]
+
+DT2 <- DT #Incorrect
+DT2 <- copy(DT) #Correct
+```
+
+* Multiple-step operations
+```{r}
+DT[,m:= {tmp <-  (x+z); log2(tmp+5)}]
+```
+
+* plyr like operations
+```{r}
+DT[,a:=x>0]
+
+DT[,b:= mean(x+w), by=a]
+```
+
+* Special variables
+  + `.N` An integer, length 1, containing the number of times a particular groups appears  
+```{r}
+set.seed(123);
+DT <- data.table(x=sample(letters[1:3], 1E5, TRUE))
+DT[, .N, by = x]#.N indicates to count
+```
+  
+* Keys  
+  + A unique aspect of `data.tables`
+  + Able to sort and subset more rapiddly than a data.frame  
+```{r}
+DT <- data.table(x=rep(c("a", "b", "c"),each=100), y=rnorm(300))
+setkey(DT,x)
+DT['a']#Finds all values of `x` that are == to 'a'
+```
+
+* Keys can also be used to facilitate joining data.tables  
+```{r}
+DT1 <- data.table(x=c('a', 'a', 'b', 'dt1'), y = 1:4)
+DT2 <- data.table(x=c('a', 'b', 'dt2'), z=5:7)
+setkey(DT1, x)
+setkey(DT2, x)
+
+merge(DT1, DT2)
+```
+
+* Also helpful for quickly reading from the disk
+```{r}
+big_df <- data.frame(x=rnorm(1E6), y=rnorm(1E6))
+file <- tempfile()
+write.table(big_df, file=file, row.names=FALSE, col.names = TRUE, sep="\t", quote=FALSE)
+system.time(fread(file))
+system.time(read.table(file, header=TRUE, sep="\t"))
+```
+
+## Quiz Scribbles
+```{r}
+#1
+URL <- "https://d396qusza40orc.cloudfront.net/getdata%2Fdata%2Fss06hid.csv"
+download.file(URL, destfile = "./Idaho_Housing.csv", method = "curl")
+ID <- read.csv("Idaho_Housing.csv")
+sum(!is.na(ID[ID$VAL==24,"VAL"]))
+```
+```{r}
+#2
+URL <- "https://d396qusza40orc.cloudfront.net/getdata%2Fdata%2FDATA.gov_NGAP.xlsx"
+filename <- paste(getwd(), "/Q2Data.xlsx", sep = "")
+download.file(URL, destfile = filename, method = "curl")
+
+library(xlsx)
+dat <- read.xlsx(filename, sheetIndex = 1, rowIndex = 18:23, colIndex = 7:15)
+sum(dat$Zip*dat$Ext, na.rm = TRUE)
+```
+
+```{r}
+#4 
+URL <- "https://d396qusza40orc.cloudfront.net/getdata%2Fdata%2Frestaurants.xml"
+filename <- paste(getwd(), "/Q4Data.xml", sep = "")
+download.file(URL, filename, "curl")
+
+library(XML)
+dat <- xmlTreeParse(filename, useInternalNodes = T)
+rootNode <- xmlRoot(dat)
+
+ZIPs <- xpathSApply(rootNode, "//zipcode", xmlValue)
+qualify <- ZIPs == "21231"
+sum(qualify)
+```
+  
+```{r}
+#5
+URL <- "https://d396qusza40orc.cloudfront.net/getdata%2Fdata%2Fss06pid.csv"
+filename <- paste(getwd(), "/Q5Data", sep = "")
+download.file(URL, filename, "curl")
+
+library(data.table)
+DT <- fread(filename)
+
+# print("tapply - False Winner")
+# tapply(DT$pwgtp15, DT$SEX, mean)
+# system.time(tapply(DT$pwgtp15, DT$SEX, mean))
+
+print("mean(by)")
+mean(DT$pwgtp15, by = DT$SEX)
+system.time(mean(DT$pwgtp15, by = DT$SEX))
+
+# print("sapply - False Winner")
+# sapply(split(DT$pwgtp15, DT$SEX), mean)
+# system.time(sapply(split(DT$pwgtp15, DT$SEX), mean))
+
+
+
+print("DT[,...] - apparently this is the fastest")
+DT[,mean(pwgtp15), by = SEX]
+system.time(DT[,mean(pwgtp15), by = SEX])
+
+ print("mean")
+ {mean(DT[DT$SEX==1,]$pwgtp15); mean(DT[DT$SEX==2,]$pwgtp15)}
+ system.time({mean(DT[DT$SEX==1,]$pwgtp15); mean(DT[DT$SEX==2,]$pwgtp15)})
+
+# print("rowMeans - Wrong") 
+# rowMeans(DT)
+# system.time({rowMeans(DT)[DT$SEX==1]; rowMeans(DT)[DT$SEX==2]})
+```
+
+
+# Data Storage Sytems and Extracting Data From Web or Databases  
+## >>
+
+
+
+## Reading from MySQL  
+* Overview
+  + Free and widelt used open source database software  
+  + Widely used in internet based applications  
+  + Data are structured in:  
+    - Databases  
+    - Tables within databases  (Dataset)
+    - Fields within tables  (Col fo dataset)
+  + Each row is called a record
+* Further Reading
+  + **(Wikipedia)[http://en.wikipedia.org/wiki/MySQL]**  
+  + **(Documentation)[http://www.mysql.com/]**  
+
+* **(Example structure)[http://dev.mysql.com/doc/employee/en/sakila-structure.html]**
+* **(How to install)[http://dev.mysql.com/doc/refman/5.7/en/installing.html]**  
+
+* **(UCSC database example)[http://genome.ucsc.edu]**
+  + `dbConnect()` - used to make a connection to a database (SQL or otherwise)
+```{r}
+library("RMySQL")
+ucscDb <- dbConnect(MySQL(), user = "genome",
+                    host = "genome-mysql.cse.ucsc.edu")
+result <- dbGetQuery(ucscDb, "show databases;") 
+#^2nd param is a MySQL cmd that we're sending to the ucscDb database using the dbGetQuery fn
+
+dbDisconnect(ucscDb) #Important to disconnect from a SQL server, returns logical
+result
+```
+
+* Connecting to hg19 (particular build of human genome) and listing tables
+  + When using `dbConnect` we pass botht he mysql server and particular database we wish to connect with   + Remember, each table is simular to a data.frame  
+```{r}
+hg19 <- dbConnect(MySQL(), user = "genome", db = "hg19",
+                  host = "genome-mysql.cse.ucsc.edu")
+allTables <- dbListTables(hg19)
+length(allTables)
+allTables[1:5]
+```
+  
+* Get dimensions of a specific table  
+  + `affyU133Plus2` is a measurement technology for measuring something about the genome  
+  + Remember: Fields are similar to a colName within a data.frame
+```{r}
+dbListFields(hg19, "affyU133Plus2")  
+dbGetQuery(hg19, "select count(*) from affyU133Plus2")
+#^"select count(*) from XXX" instructs mysql to return the num of fields in XXX
+
+## Read from the table  
+affyData <- dbReadTable (hg19, "affyU133Plus2")
+head(affyData)
+```
+  
+* Select a specific subset
+  + `select` *all observations* `from` *this table* `where` *colName (are)* `between` *desired range*
+```{r}
+query <- dbSendQuery(hg19, "select * from affyU133Plus2 where misMatches between 1 and 3")
+affyMis <- fetch(query)
+quantile (affyMis$misMatches)
+
+##Select only the first bit of data:
+affyMisSmall <- fetch(query, n = 10)
+dbClearResult(query)
+#^This will clear the query that is sitting in the MySQL server, returns logical  
+
+dim(affyMisSmall)#To see the small subset we just selected
+```
+  
+* More queries are in the MySQL documentation
+
+* ALWAYS remember to close the connection  
+```{r}
+dbDisconnect(hg19)
+```
+
+* Further resources
+  + **(RMySQL vignette)[http://cran.r-project.org/web/paclages/RMySQL/RMySQL.pdf]**  
+  + **(List of commands)[http://www.pantz.org/software/mysql/mysqlcommands.html]**  
+    - **DO NOT:** delete, add or join things; Only select (Unless your intent is to update the server)
+    - In general be careful with mysql commands, because you can delete data that others are working on.
+  + **(A nice blog post summarizing some other comamnds)[http://www.r-bloggers.com/mysql-and-r/]**  
+
+## Reading from HDF5  
+* Heirarchical Data Format  
+  + Used for storing large data sets  
+  + Supports storing a range of data types  
+  + Optimizes reading and writing to the disk in R
+* Data is stored in *groups* containing zero or more data sets and metadata. Each group has:  
+  + a *group header* with group name and list of attributes  
+  + a *group symbol table* with a list of objects in the group  
+* *Datasets* are a multidimensional array of data elements with metadata. Can have:   
+  + a *header* with name, datatype, dataspace, and storage layout  
+  + a *data array* with the data  
+
+* Package is installed with bioconductor
+  + First time you install a package with `biocLite` you'll also have to execute `install.packages("BiocManager"); BiocManager::install("rhdf5")` to load the `biocLite()` function. (Note: I had a lot of trouble with this, so additional steps may be required)
+* The lecture is modeled very closely on **(the rhdf5 tutorial on bionconductor's website)[http://www.bioconductor.org/packages/release/bioc/vignettes/rhdf5/inst/doc/rhdf5.pdf]**  
+* The HDF group **(has information on HDF5 in general)[http://www.hdfgroup.org/HDF5/]**
+```{r}
+library(rhdf5)
+created <- h5createFile("example.h5")
+created #TRUE if a new file was made, false if it already exists
+```
+
+```{r}
+created <- h5createGroup("example.h5", "foo")
+created <- h5createGroup("example.h5", "baa")
+created <- h5createGroup("example.h5", "foo/foobaa")
+h5ls("example.h5")
+```
+
+* Write to groups  
+```{r}
+A <- matrix(1:10, nrow = 5, ncol = 2)
+h5write(A, "example.h5", "foo/A")
+B <- array(seq(0.1, 2.0, by = 0.1), dim = c(5, 2, 2))
+attr(B, "scale") <- "liter" #Attribute gets added to metadata for colName == "B"
+h5write(B, "example.h5", "foo/foobaa/B")
+h5ls("example.h5")
+```
+
+* Write a data set  
+```{r}
+df <- data.frame(1L:5L, seq(0,1, length.out = 5),
+                 c("ab", "cde", "fghi", "a", "s"), stringsAsFactors = FALSE)
+if(is.null(h5ls("example.h5")))
+{  h5write(df, "example.h5", "df") }
+h5ls("example.h5")
+```
+
+* Reading data  
+```{r}
+readA <- h5read("example.h5", "foo/A")
+readB <- h5read("example.h5", "foo/foobaa/B")
+readdf <- h5read("example.h5", "df")
+readA
+```
+
+* Writing and reading chunks
+```{r}
+h5write(c(12,13,14), "example.h5", "foo/A", index = list(1:3,1)) #index indicates where data should be written
+h5read("example.h5", "foo/A")
+```
+
+
+## Reading from The Web  
+* *Webscraping -* Programtically extracting data from the HTML code of websites.  
+  + It can be a great way to get data  **[How Netflix reverse engineered Hollywood](https://www.theatlantic.com/technology/archive/2014/01/how-netflix-reverse-engineered-hollywood/282679/)**
+  + Sometimes this is against the terms of service for the website  
+  + Attepting to read too many pages too quickly can get your IP address blocked  
+
+* Getting data off webpages - `readLines()`  
+```{r}
+con <- url("https://scholar.google.com/citations?user=HI-I6C0AAAAJ&hl=en&oi=ao")
+htmlCode = readLines(con)
+close(con)
+substr(htmlCode, 1, 80)#For a preview
+```
+
+* Parsing with XML  
+```{r}
+library(XML)
+library(RCurl)
+url <- "https://scholar.google.com/citations?user=HI-I6C0AAAAJ&hl=en&oi=ao"
+html <- htmlTreeParse(getURL(url), useInternalNodes = TRUE)
+xpathSApply(html, "//title", xmlValue)
+xpathSApply(html, "//td[@id='col-citedby']", xmlValue) #They changed the title and I can't find it
+```
+
+
+* GET fromt he httr package  
+```{r}
+library(httr)
+url <- "https://scholar.google.com/citations?user=HI-I6C0AAAAJ&hl=en&oi=ao"
+html2 <- GET(url)  
+content2 <- content(html2, as = "text")
+parsedHtml <- htmlParse(content2, asText = TRUE)
+xpathSApply(parsedHtml, "//title", xmlValue)
+
+```
+
+* Accessing websites with passwords  
+```{r}
+pg1 <- GET("http://httpbin.org/basic-auth/user/passwd")
+pg1 #returns 401 error
+```
+```{r}
+pg2 <- GET("http://httpbin.org/basic-auth/user/passwd", 
+            authenticate("user", "passwd"))
+pg2 #Username and password are accepted
+names(pg2)
+```
+
+* Using handles allows you to not have to re-authenticate  
+```{r}
+google = handle("http://google.com")
+pg1 <-  GET(handle = google, path = "/")
+pg2 = GET(handle = google, path = "search")
+```
+
+* Further resources  
+  + **(R Bloggers sahs a number of examples of web scraping)[http://www.r-bloggers.com/?s=Web+Scraping]**  
+  + **(The httr help file has useful examples)[http:cran.r-project.org/web/packages/httr/httr.pdf]**
+
+## Reading from APIs  
+* *API -* Application Programming Interfaces  
+  + Often have to create a dev account **(Twitter)[https://dev.twitter.com/apps]**
+* ... (Little instruction was provided on how to set up the API, so I'm not even sure if I did it correctly)
+  + Access Token: **1182685077089722369-ydEBDC6bazluY5j8wGj0oqIx9ayQ7B**  
+  + Access token secret: **RctQSVtfGelTCfs2rIVMalfmMNyQk40NLZhhgECk0ekCP**  
+  + API key: **s9FXX7R5Cjb5Oyr8NpH1HDTzj**  
+  + API secret key: **7c3JnIIviRiapbkD0Ipp25n6cBFvUuHOdSiDSqd62LKLhOe5zl**  
+```{r}
+##Running this in markdown crashed R for me
+library(httr)
+ myapp <- oauth_app("twitter",
+                    key = "s9FXX7R5Cjb5Oyr8NpH1HDTzj",
+                    secret = "7c3JnIIviRiapbkD0Ipp25n6cBFvUuHOdSiDSqd62LKLhOe5zl")
+ sig <- sign_oauth1.0(myapp,
+                       token = "1182685077089722369-ydEBDC6bazluY5j8wGj0oqIx9ayQ7B",
+                       token_secret = "7c3JnIIviRiapbkD0Ipp25n6cBFvUuHOdSiDSqd62LKLhOe5zl")
+ homeTL <- GET("https://api.twitter.com/1.1/statuses/home_timeline.json", sig)
+```
+* "https://api.twitter.com/1.1/statuses/home_timeline.json" is a particular URL depending on what data you wish to get out.
+  + `1.1` - version of api
+  + `statuses/home_timeline` - specifies data  
+  + `.json` specifies output (as of 1.1 twitter only has JSON)
+  
+* Converting the JSON object  
+```{r}
+#Then this shid can't authenticate me 
+library(httr)
+json1 <- content(homeTL)
+library(jsonlite)
+json2 <- jsonlite::fromJSON(toJSON(json1))
+json2[1]
+```
+
+* There's documentation about twitter API... somewhere, the f***in' link doesn't work  
+
+* Overview  
+  + httr allows `GET`, `POST`, `PUT`, `DELETE` requests if you are authorized  
+  + You can authernticate with a user name or a password  
+  + Most modern APIs use something like oauth  
+  + httr works well with Facebook, Google, Twitter, Github, etc.  
+
+## Reading from Other Sources
+* Roger has a video, **(There's An R Package for That)[https://www.youtube.com/watch?v=yhTerzNFLbo]**  
+* In general the best way to find out if the R package exists is to search "<data storage mechanism> R package"
+  + For example: "MySQL R package"  
+* Interacting more directly with files  
+  + `file` - open a connection to a text file  
+  + `url` - open a connection to a url  
+  + `gzfile` - open a connection to a .gz file  
+  + `bzfile` - open a connection to a .bz2 file  
+  + `?connections` for more information
+  + ***Remember to close connections*** 
+
+* Foreign Packages - Helpful if you work with people that use other programming languages  
+  + Loads data from `Minitab`, `S`, `SAS`, `SPSS`, `Stata`, `Systat`  
+  + Basic functions are `read.fileType`  
+    - `read.arff` (Weka)  
+    - `read.dta` (Stata)  
+    - `read.mtp` (Minitab)  
+    - `read.octave` (Octave)  
+    - `read.spss` (SPSS)  
+    - `read.xport` (SAS)
+  + **(See the help page for more details)[http://cran.r-project.org/web/packages/foreign/foreign.pdf]**  
+  
+* Examples of other database packages
+
+  + RPostresSQL provides a DBI-compliant database connection from R.
+    - **(Tutorial)[https://code.google.com/p/rpostgresql/]** 
+    - **(help file)[http://cran.r-project.org/web/packages/RPostgreSQL/RPostgreSQL.pdf]**
+  + RODBC provides interfaces to multiple databases including PostgreQL, MySQL, Microsoft Access and SQLite.
+    - **(Tutorial)[http://cran.r-project.org/web/packages/RODBC/vignettes/RODBC.pdf]**
+    - **(help file)[http://cran.r-project.org/web/packages/RODBC/RODBC.pdf]**
+  + RMongo 
+    - **(Tutorial)[http://cran.r-project.org/web/packages/RMongo/RMongo.pdf]**
+    - **(example of Rmongo)[http://www.r-bloggers.com/r-and-mongodb/]
+    - **(example of rmongodb)[http://cran.r-project.org/web/packages/rmongodb/rmongodb.pdf]** 
+    - Both of which provide interfaces to MongoDb. 
+
+* Reading images
+
+  + **(jpeg)[http://cran.r-project.org/web/packages/jpeg/index.html]**
+  + **(readbitmap)[http://cran.r-project.org/web/packages/readbitmap/index.html]**
+  + **(png)[http://cran.r-project.org/web/packages/png/index.html]**
+  + **(EBImage (Bioconductor))[http://www.bioconductor.org/packages/2.13/bioc/html/EBImage.html]**
+
+
+* Reading GIS data
+
+  + **(rgdal)[http://cran.r-project.org/web/packages/rgdal/index.html]**  
+  + **(rgeos)[http://cran.r-project.org/web/packages/rgeos/index.html]**
+  + **(raster)[http://cran.r-project.org/web/packages/raster/index.html]**
+
+* Reading music data
+
+  + **(tuneR)[http://cran.r-project.org/web/packages/tuneR/]**  
+  + **(seewave)[http://rug.mnhn.fr/seewave/]**  
+
+## Quiz Scribbles  
+
+1) Register an application with the Github API **(here)[https://github.com/settings/applications]**. Access the API to get information on your instructors repositories (hint: this is the url you want "https://api.github.com/users/jtleek/repos"). Use this data to find the time that the datasharing repo was created. What time was it created?
+
+**(This tutorial may be useful)[https://github.com/hadley/httr/blob/master/demo/oauth2-github.r]**. You may also need to run the code in the base R package and not R studio.
+
+```{r eval = FALSE}
+#1 - Authentication
+myapp <- oauth_app("github",
+             key = "cd0a71fdf4a07ef2d2a2",
+             secret = "8b8a5ebe8a36f41e6970f4f8dd8467dbc0a7c451")
+github_token <- oauth2.0_token(oauth_endpoints("github"), myapp)
+
+gtoken <- config(token = github_token)
+req <- GET("https://api.github.com/rate_limit", gtoken)
+stop_for_status(req)
+content(req)
+```
+
+```{r eval = FALSE}
+#1 - Finding when jtleek's datasharing repo was created 
+##(Couldn't figure it out with API so just used JSON)
+library(httr)
+library(jsonlite)
+info <- fromJSON("https://api.github.com/users/jtleek/repos")
+target <- info$name=="datasharing"
+info$created_at[target]
+```
+
+2) The `sqldf` package allows for execution of SQL commands on R data frames. We will use the sqldf package to practice the queries we might send with the `dbSendQuery` command in `library(RMySQL)`.
+
+Download the American Community Survey data ... and load it into an R object called `acs`
+```{r}
+url <- "https://d396qusza40orc.cloudfront.net/getdata%2Fdata%2Fss06pid.csv"
+saveLoc <- paste(getwd(), "/AmericanCommunitySurvey.csv", sep ="")
+download.file(url, saveLoc, method = "curl")
+# ...
+library(RCurl)
+acs <- read.csv(saveLoc)
+```
+
+
+Which of the following commands will select only the data for the probability weights `pwgtp1` with ages less than 50?
+```{r}
+#library(RSQLite)
+#library(sqldf)
+
+#Incorrect# sqldf("select pwgtp1 from acs")
+
+#Incorrect# sqldf("select * from acs where AGEP < 50")
+
+#sqldf("select pwgtp1 from acs where AGEP < 50")
+
+#Incorrect# sqldf("select * from acs")
+```
+
+3) Using the same data frame you created in the previous problem, what is the equivalent function to `unique(acs$AGEP)`?
+```{r}
+# error <- "Syntax error"
+# ogFn <- unique(acs$AGEP)
+# Op1 <- error #sqldf("select unique AGEP from acs")
+# Op2 <- sqldf("select distinct pwgtp1 from acs")
+# Op3 <- error #sqldf("select AGEP where unique from acs")
+# Op4 <- sqldf("select distinct AGEP from acs")
+# selection <- c(Op1, Op2, Op3, Op4)
+# #ogFn ##Output was gross so I omitted this
+# selection[2]
+# selection[4]
+```
+
+4) How many characters are in the 10th, 20th, 30th and 100th lines of HTML from **[this](http://biostat.jhsph.edu/~jleek/contact.html)** page:
+```{r}
+# url <- "http://biostat.jhsph.edu/~jleek/contact.html"
+# htmlCode <- readLines(url(url))
+# nchar(htmlCode[c(10,20,30,100)])
+```
+
+5) Read **[this](https://d396qusza40orc.cloudfront.net/getdata%2Fwksst8110.for)** data set into R and report the sum of the numbers in the 4th of the 9th columns. (**[Original source of the data](http://www.cpc.ncep.noaa.gov/data/indices/wksst8110.for)**)
+```{r}
+url <- "https://d396qusza40orc.cloudfront.net/getdata%2Fwksst8110.for"
+saveLoc <- paste(getwd(), "/Quiz2_Q5_Dataset.for", sep="")
+download.file(url, saveLoc, "curl")
+info <- read.fwf(saveLoc, widths = c(10, rep(c(-5, 4, 4),4)))
+info <- info[-4:-1,] #removing header
+sum(as.numeric(as.character(info[,4])),as.numeric(as.character(info[,9])))
+```
+
+## Side tangent
+While reading **[a FiveThirtyEight article](https://projects.fivethirtyeight.com/congress-trump-score/votes/)** I noticed that there was a 1 vote diffrence between Whether to convict President Trump on a charge of: **[obstruction of Congress](https://www.senate.gov/legislative/LIS/roll_call_lists/roll_call_vote_cfm.cfm?congress=116&session=2&vote=00034)** (47-53), and **[abuse of power](https://www.senate.gov/legislative/LIS/roll_call_lists/roll_call_vote_cfm.cfm?congress=116&session=2&vote=00033)** (48-52). So the (obvious) question is, who was the swing voter? The following codeblock is to determine this.
+```{r}
+#obstruction of Congress
+SenateVote <- function(URL, filename) {
+library(XML)
+url <- URL
+saveLoc <- paste(getwd(), filename, sep = "/")
+download.file(url, saveLoc)
+info <- xmlTreeParse(saveLoc, useInternalNodes = TRUE)
+root <- xmlRoot(info)
+members <- root[["members"]]
+senatorsLN <- xpathSApply(members, "//last_name", xmlValue)
+senatorsVote <- xpathSApply(members, "//vote_cast", xmlValue)
+df <- data.frame(name = senatorsLN, vote = senatorsVote)
+df
+}
+
+URL <- ("https://www.senate.gov/legislative/LIS/roll_call_votes/vote1162/vote_116_2_00034.xml")
+filename <- "Obstruction.xml"
+obstruction <- SenateVote(URL, filename)
+
+URL <- "https://www.senate.gov/legislative/LIS/roll_call_votes/vote1162/vote_116_2_00033.xml"
+filename <- "Abuse.xml"
+abuse <- SenateVote(URL, filename)
+
+dif <- (obstruction[,2] != abuse[,2])
+data.frame(Name = abuse[dif,1], Obstruction = obstruction[dif,2], Abuse = abuse[dif,2])
+```
+Looks like it was our man, "R-money".
+
+
+# Organizing, Merging, and Managing the Data  
+* When getting a dataset the first goal is to convert it into *tidy data*.
+  + each variable is a column  
+  + each observation is a row  
+  + Each table/file stores data about one kind of observation (e. g. people/hospitals)  
+
+##**[Hadley's paper on tidy data](http://vita.had.co.nz/papers/tidy-data.pdf)**
+* Tidy data facilitates inital exploration and analysis of the data  
+* Sometimes what one variable is will vary depending on the field the analysis is in (Pg. 4)
+*(tidy data) ensures that values of different variables from the same observationa re always paired
+* a good ordering of variables and observations make sit easier to can the raw values
+  + Fixed variables should come first (e. g. `country`, `year`)
+  + measured variables shoudl follow (e. g. `week 1`, `week 2`, ...)
+  + Rows can then be ordered by the first variable, breaking ties witht he second and subsequent variables  
+* Tools for tidying:
+  + Melting - turning columns into rows (`col`s of varrying income should be in one col, `income`)
+  + String splitting - separating cnames when they contain more than 1 variable
+  + Casting - creating varNames from elements in data
+* **[The datasets and the R code used to tidy them in this paper](https://github.com/hadley/tidy-data)**
+* Five most common problems with messy data: 
+  1) Column headers are values, not variable names  
+    + Tidyed with melting
+    + Ex: cols - income bracker, rows - religion; should be that cols are: `religon`, `income`, `freq`
+  2) Multiple variables are stored in one column  
+    + Tidyed with string splitting
+    + Ex: sex & age are stored in a column (`m014`, `m1524`, `...`, `f014`, `f1524`, `...`)
+  3) Variables are stored in both rows and columns  
+    + Tidyed with melting followed by casting
+    + Ex: weather data with `d1:31` listed as colNames as well as element determining `tmax` or `tmin` for max and min tempature (respectively) 
+  4) Multiple types of observational units are stored in the same table  
+    + Tidyed by separating observational data into seperate tables  
+    + Ex: Song Billboard dataset - `artist`, `song name` and `time` are one observation, then `rank` and it's respective `week`
+  5) A single observational unit is stored in multiple tables  
+    + Tidyed by pulling the data into one table
+    + Ex: Baby names per year pulled into a database of all baby names
+  
+## Subsetting and Sorting
+* Subsetting - quick review  
+```{r}
+set.seed(13435)
+X <- data.frame("var1"=sample(1:5), "var2"=sample(6:10), "var3"=sample(11:15))
+X <- X[sample(1:5),] #shuffle the df by row
+X$var2[c(1,3)] <- NA #Insert NA at 1st and 3rd index of var2
+X
+X[,1] #Returns first col
+X[,"var1"]#Can also use variable name  
+X[1:2, "var2"] #output first two values of var2
+```
+
+* Logicals ands & ors  
+```{r}
+X[(X$var1 <= 3 & X$var3 > 11),] #Ex of an "and" logical  
+X[(X$var1 <= 3 | X$var3 > 15),] #Ex of an "or" logical
+```
+
+* Dealing with missing values  
+```{r}
+X[which(X$var2 > 8),]# returns values 'which' var2 > 8 & skips NA values
+```
+
+* Sorting  
+```{r}
+sort(X$var1) #increasing by default
+sort(X$var1, decreasing = TRUE)
+sort(X$var2) #Removes NAs by default
+sort(X$var2, na.last = TRUE)
+sort(X$var2, na.last = FALSE)#Puts NAs up front
+```
+
+* Ordering (Sorts whole d.f. with respect to 1 or more vars)  
+```{r}
+X[order(X$var1),]
+X[order(X$var1, X$var3),]#Same result since there are no ties in var1
+```
+
+* Ordering with `plyr` package
+  + The `plyr` package was written by Hadley Wickham  
+```{r}
+library(plyr)
+arrange(X,var1)
+arrange(X,desc(var1))#Puts it in descending order
+```
+
+* Adding rows and columns  
+```{r}
+X$var4 <- rnorm(5)
+X
+
+#Or with cbind command (column bind)
+Y <- cbind(X, rnorm(5))#binds in order of params
+Y
+#Similar function called rbind
+```
+
+* **[Andrew Jaffe's lecture notes](http://www.biostat.jhsph.edu/~ajaffe/lec_winterR/Lecture%202.pdf)**
+
+
+
+## Summarizing Data  
+* Key process of data cleaning is to identify any quirks or weird issues you need to address before doing your analysis  
+* Example is using **[Restaurant data from the city of Baltimore](https://data.baltimorecity.gov/Community/Restaurants/k5ry-ef3g/data)**
+```{r}
+if(!file.exists("./data")){dir.create("./data")}
+fileUrl <- "https://data.baltimorecity.gov/api/views/k5ry-ef3g/rows.csv?accessType=DOWNLOAD"
+saveLoc <- paste0(getwd(), "/data/restaurants.csv")
+download.file(fileUrl, saveLoc, method = "curl")
+restData <- read.csv(saveLoc)
+```
+
+### Look at a bit of the data  
+```{r}
+head(restData, n = 3) #n will determine number of rows to show, default is 6
+tail(restData, n = 3)
+```
+
+### Make summary  
+  + Gives a summary for every variable
+  + Text based variables will show a count
+  + Quanitative variables will show a stat summary
+    - In the below example the Min. value shows a negative value for a zipCode, which shouldn't have occured  
+
+```{r}
+summary(restData)
+
+#Checking that negative zipcode
+restData$name[(restData$zipCode == -21226)]
+
+#Perhaps the negative was to list this location twice
+restData$name[(restData$zipCode == 21226)][16] 
+
+```
+
+### `str` command
+    - Tells info about data type of variable and it's classes
+```{r}
+str(restData)
+```
+    
+### Quantiles of quantitative variables  
+```{r}
+quantile(restData$councilDistrict, na.rm = TRUE)
+
+#Can also change the percentiles of the function
+quantile(restData$councilDistrict, probs = c(0.5,0.75,0.9))
+```
+  
+### Make table
+```{r}
+table(restData$zipCode)
+
+#2D table
+table(restData$councilDistrict, restData$zipCode)[,1:15]#1:15 to limit output
+```
+  
+### Check for missing values  
+```{r}
+sum(is.na(restData$councilDistrict))#Returns num of NA values
+
+any(is.na(restData$councilDistrict))#Returns TRUE if any of the values are NA
+
+all(restData$zipCode > 0)#FALSE if at least 1 value is <0
+```
+
+### Row and column sums
+```{r}
+colSums(is.na(restData))
+all(colSums(is.na(restData))==0)#TRUE if there are no NA values
+```
+
+### Values with specific characteristics
+```{r}
+table(restData$zipCode %in% c("21212"))
+table(restData$zipCode %in% c("21212", "21213"))
+
+#Subsetting with ^that logical (table isn't part of the command)
+restData[restData$zipCode %in% c("21212", "21213"),]
+```
+
+### Cross tabs  
+```{r}
+data(UCBAdmissions) #This is a dataset included in R
+DF <- as.data.frame(UCBAdmissions)
+summary(DF)
+
+xt <- xtabs(Freq ~ Gender + Admit, data = DF) #susbet is optional
+xt #Freq table of Gender to num of Admissions
+```
+
+### Flat tables  
+```{r}
+#warpbreaks is another dataset included in R
+warpbreaks$replicate <- rep(1:9, len = 54)
+xt <- xtabs(breaks ~., data=warpbreaks)#Break by all(.) variables in dataset
+xt
+ftable(xt)#summarizes data in a more compact form
+```
+
+### Size of a data set
+```{r}
+fakeData <- rnorm(1e5)
+object.size(fakeData)
+print(object.size(fakeData), units = "Mb")#Change units
+```
+
+
+## Creating New Variables  
+* Intro:
+  + Often the raw data won't have a value you are looking for  
+  + You will need to transform the data to get the values you would like  
+  + Usually you will add those values to the data frames you're working with
+  
+* Common variables to create  
+  + Missingness indicators  
+  + "Cutting up" quantitative variables  
+  + Applying transforms  
+* Still using Baltimore restaurant data
+```{r}
+head(restData) #should exist from previous section
+```
+
+* Creating sequences (`seq`)
+  + Often used to index operations you're going to use on a data set
+  + `by` - increases "by" the amount to UB
+```{r}
+s1 <- seq(1,10, by = 2)
+s1
+```
+  
+  + `length` - Creates a sequence of specified "length", starting at LB and ending at UB  
+```{r}
+s2 <- seq(1,10, length = 3)
+s2
+```
+  
+  + `along` - Creates a vector with the same length of given variable
+```{r}
+x <- c(2, 3, 8, 25, 100)
+seq(along = x)
+```
+  
+* Subsetting variables
+  + Indicates what subset another variable comes from  
+  + Below we create a new subset, `nearMe`   
+```{r}
+saveLoc <- paste0(getwd(), "/data/restaurants.csv")
+restData <- read.csv(saveLoc)
+#restData$nearMe <- restdata$neighborhood %in% c("Roland Park", "Homeland") #Assigns to DF itself
+#table(restData$nearMe)
+```
+
+* Creating bianry variables
+```{r}
+restData$zipWrong <- ifelse(restData$zipCode < 0, TRUE, FALSE)
+table(restData$zipWrong, restData$zipCode < 0)
+```
+
+* Creating categorical variables
+  + `cut` - cuts subset into sections determined by `breaks` param  
+```{r}
+restData$zipGroups <- cut(restData$zipCode, breaks = quantile(restData$zipCode))
+table(restData$zipGroups)
+```
+
+* Easier cutting
+  + `cut2` - number of groups you want is determined by the `g` param  
+```{r}
+library(Hmisc)
+restData$zipGroups <- cut2(restData$zipCode, g = 4)
+table(restData$zipGroups)
+```
+
+### Factor variables  
+* Creating factor variables  
+```{r}
+restData$zcf <- factor(restData$zipCode)
+restData$zcf[1:10]
+class(restData$zcf)
+```
+
+* Levels of factor variables
+```{r}
+yesno <- sample(c("yes", "no"), size = 10, replace = TRUE)
+yesnofac <- factor(yesno, levels = c("yes", "no"))
+relevel(yesnofac, ref = "yes")
+as.numeric(yesnofac)
+```
+
+* Cutting produced factor variables  
+```{r}
+library(Hmisc)
+restData$zipGroups <- cut2(restData$zipCode, g=4)
+table(restData$zipGroups)
+```
+
+* Using the `mutate` function to create a new verison of a variable and apply it to the existing dataset
+```{r}
+library(Hmisc); library(plyr)
+restData2 <- mutate(restData, zipGroups=cut2(zipCode, g=4))
+table(restData2$zipGroups)
+```
+
+### Common transforms
+* `abs(x)` - absolute value
+* `sqrt(x)` - square root  
+* `ceiling(x)` - ceiling(3.475) is 4  
+* `floor(x)` - floor(3.475) is 3
+* `round(x, digits = n)` - round(3.75, digits = 2) is 3.48  
+* `signif(x,digits = n)` - signif(3.475, digits = 2) is 3.5  
+* `cos(x), sin(x)`, etc - Trig functions  
+* `log(x)` - natrual logarithm  
+* `log2(x)`, `log10(x)` - other common logs  
+* `exp(x)` - exponentiating x
+
+* **[A tutorial from Hadley Wickham on plyr](http://plyr.had.co.nz/09-user/)**
+
+## Reshaping Data  
+
+* Start with reshaping
+```{r}
+library(reshape2)
+head(mtcars)
+```
+
+* Melting data frames
+  + Rownames as the carname is untidy, likewise gear & cyl refer more to the type of car. The variable of intrest is `mpg` or `hp`
+  + `id` param is the *fixed variables*  
+  + `measure.vars` is the... measured variables  
+```{r}
+mtcars$carname <- rownames(mtcars)
+carMelt <- melt(mtcars, id = c("carname", "gear", "cyl"), measure.vars = c("mpg", "hp"))
+head(carMelt, n = 3)
+tail(carMelt, n = 3)
+```
+
+* Casting data frames  
+```{r}
+cylData <- dcast(carMelt, cyl ~ variable)
+cylData #Puts cyl in left, then variables in following cols
+
+#Can compute transforms at this point
+cylData <- dcast(carMelt, cyl ~ variable,mean)
+cylData
+```
+
+* Averaging values
+```{r}
+head(InsectSprays)
+
+#Take sum of count by the `spray`
+tapply(InsectSprays$count, InsectSprays$spray, sum)
+```
+
+* Another way with `split` then `lapply`
+```{r}
+spIns <- split(InsectSprays$count, InsectSprays$spray)
+spIns
+
+sprCount <- lapply(spIns, sum)
+sprCount
+```
+
+* Another way - combine
+```{r}
+unlist(sprCount)
+sapply(spIns, sum)
+```
+
+* Another way with `plyr` package  
+```{r}
+#. is needed so quotes aren't
+
+#sapply(InsectSprays,.(spray), summarize, sum = sum(count))
+```
+
+* Creating a new variable  
+```{r}
+# spraySums <- ddply(InsectSprays,.(spray), summarize, sum = ave(count, FUN = sum))
+# dim(spraySums)#Same num as InsectSprays
+# head(spraySums)
+```
+
+* Some other functions
+  + `acast` - for casting as multi-dimensional arrays
+  + `arrange` - for faster reordering without using `order()` commands  
+  + `mutate` - adding new variables
+
+## Managing Data Frames with dplyr - Intro  
+* Verbs to be covered:
+  + `select` - return a subset of the columns of a data frame  
+  + `filter` - extract a subset of rows from a data frame based on logical conditions  
+  + `arrange` - reorder rows of a data frame  
+  + `rename` - rename variables in a data frame  
+  + `mutate` - add new variables/columns or transform existing variables  
+  + `summarise` / `summarize` - generate summary statistics of different variabels in the data frame, possibly within `strata`
+  + `print` - prevents a lot of data printing to the console  
+  
+* `dplyr` is used to work with data frames, the key structure in statistics and `R`  
+  + part of the *tidyverse*, as such it was developed by Hadley Wickham  
+  + An optimized & distilled version of the `plyr` package (Also by Hadley)  
+    - Does not provide any "new" functionality  
+  + Is **very** fast, as many key operations are coded in `C++`  
+* Arguments
+  + The first argument is always a data frame.
+  + The subsequent arguments describe what to do with it
+    - You can refer to columns in the data frame directly, without the `$` operator (just use the names)  
+* Data must be properly formatted and annotated (tidy) for this to all be useful  
+* A new data.frame is always returned  
+
+
+## Managing Data Frames with dplyr - Basic Tools  
+* When loading `dplyr` a few warning will appear telling of masked functions  
+```{r}
+library(dplyr)
+```
+
+```{r}
+#Data used in examples
+url <- "https://github.com/DataScienceSpecialization/courses/blob/master/03_GettingData/dplyr/chicago.rds?raw=true"
+dir <- "data"
+filename <- "Chicago.rds"
+ogDir <- getwd()
+saveLoc <- paste(ogDir, dir, filename, sep = "/")
+download.file(url, saveLoc, method = "curl", extra = "-L")
+
+setwd(paste(ogDir, dir, sep = "/"))
+chicago <- readRDS(file = saveLoc)
+setwd(ogDir)
+```
+
+```{r}
+#Checking out the data set
+dim(chicago)
+str(chicago)
+names(chicago)
+print(paste("This data is from ", chicago$date[1], " to ", chicago$date[length(chicago[,1])], sep = ""))
+```
+
+* `select` function  
+
+```{r}
+#dplyr allows referencing to colnames as if they were ordinal objects
+head(select(chicago, city:dptp))
+
+#One can also use the minus sign
+head(select(chicago, -(city:dptp)))
+```
+
+```{r}
+#Base R equivelent
+i <- match("city", names(chicago))
+j <- match("dptp", names(chicago))
+head(chicago[, -(i:j)])
+```
+
+* `filter` function (keeps the `TRUE` parts of logical)  
+```{r}
+chic.f <- filter(chicago, pm25tmean2 > 30)
+head(chic.f, 10)
+
+#Can accept more complex logicals
+chic.f <- filter(chicago, pm25tmean2 > 30 & tmpd > 80)
+head(chic.f)
+```
+
+* `arrange` function  
+```{r}
+chicago <- arrange(chicago, date)
+head(chicago)
+
+chicago <- arrange(chicago, desc(date))
+head(chicago)
+```
+
+* `rename` function  
+```{r}
+#For reproducability
+if(any(colnames(chicago) == "pm25")){
+  chicago <- rename(chicago, pm25tmean2 = pm25)}
+if(any(colnames(chicago) == "dewpoint")){
+  chicago <- rename(chicago, dptp = dewpoint)}
+
+#Showing rename function
+chicago <- rename(chicago, pm25 = pm25tmean2, dewpoint = dptp)
+head(chicago)
+```
+
+* `mutate` function 
+```{r}
+chicago <- mutate(chicago, pm25detrend = pm25-mean(pm25, na.rm = TRUE))
+head(select(chicago, pm25, pm25detrend))
+```
+
+* `groupby` function
+```{r}
+#First we'll create a tempcat variable to show if the day was hot or cold
+chicago <- mutate(chicago, tempcat = factor(1 * (tmpd > 80), labels = c("cold", "hot")))
+
+
+hotcold <- group_by(chicago, tempcat)
+#Now summarize will split info by tempcat factor
+summarize(hotcold, pm25 = mean(pm25, na.rm = TRUE), o3 = max(o3tmean2), no2 = median(no2tmean2))
+
+chicago <- mutate(chicago, year = as.POSIXlt(date)$year + 1900)
+years <- group_by(chicago, year)
+summarize(years, pm25 = mean(pm25, na.rm = TRUE), o3 = max(o3tmean2), no2 = median(no2tmean2))
+```
+
+* Chaining operations together with *pipe* `%>%`  
+  + Don't need to specify data frame with *pipe* because it's implied  
+  + Helps you not have to assign additional temp variables
+```{r}
+chicago %>% mutate(month = as.POSIXlt(date)$mon + 1) %>% group_by(month) %>% summarize(pm25 = mean(pm25,
+ na.rm = TRUE), o3 = max(o3tmean2), no2 = median(no2tmean2))
+
+```
+
+* Additional benefits to `dplyr`
+  + `dplyr` can work with other data frame "backends"  
+  + works with `data.table` which is for large data sets  
+  + allows one to interact with SQL interface for relational databases via the `DBI` package  
+
+
+## Merging Data  
+* Example will use: Peer review data
+```{r}
+saveDir <- paste(getwd(), "/data", sep = "")
+if (!file.exists(saveDir)) {dir.create(saveDir)}
+reviewUrl <- "https://raw.githubusercontent.com/jtleek/dataanalysis/master/week2/007summarizingData/data/reviews.csv"
+solUrl <- "https://raw.githubusercontent.com/jtleek/dataanalysis/master/week2/007summarizingData/data/solutions.csv"
+
+saveLoc <- paste(saveDir, "/review.csv", sep = "")
+download.file(reviewUrl, saveLoc, method = "curl")
+reviews <- read.csv(saveLoc)
+
+saveLoc <- paste(saveDir, "/solutions.csv", sep = "")
+download.file(solUrl, saveLoc, method = "curl")
+solutions <- read.csv(saveLoc)
+
+rm(saveLoc)#Because it's value was somewhat ambiguious
+
+head(reviews, 2)
+head(solutions, 2)
+```
+
+* Merging data frames with the `merge()` function  
+  + Important parameters:
+  + `x` - First data frame
+  + `y` - Second data frame
+  + `by` - Default is to merge by columns with common names
+  + `by.x` - 
+  + `by.y` -
+  + `all` - Logical for if all names should be included 
+    - (If `x` has a name `y` does not then y will have `NA` for the values in that missing column)
+```{r}
+mergedData <- merge(reviews, solutions, by.x = "solution_id", by.y = "id", all = TRUE)
+head(mergedData)
+```
+
+* Default - merge all common column names  
+```{r}
+intersect(names(solutions), names(reviews)) #Displays == names 
+mergedData2 <- merge(reviews, solutions, all = TRUE)
+head(mergedData2) #Start and stop times were diffrent in datasets so they make diffrent rows when they don't align
+``` 
+
+* Using `join` in the `plyr` package  
+  + Faster, but less full featured - defaults to left join, see help file for more  
+```{r}
+df1 <- data.frame(id = sample(1:10), x = rnorm(10))
+df2 <- data.frame(id = sample(1:10), y = rnorm(10))
+df3 <- data.frame(id = sample(1:10), z = rnorm(10))
+dfList = list(df1, df2, df3)
+join_all(dfList) #Merges datasets by common variable
+```
+  
+* More on merging data  
+  + **[The quick R data merging page](http://www.statmethods.net/management/merging.html)**
+  + **[plyr information (Hadley's site)](http://plyr.had.co.nz/)**
+  + **[Types of joins](http://en.wikipedia.org/wiki/Join_(SQL))**
+
+
+## Lessons with `swirl()`  
+### Manipulating Data with dplyr    
+* dplyr can work with: data tables, databases, and multidimensional arrays; in addition to, the prefered, data frames. 
+* This lesson work with a `csv` data set which I've saved  and shall assign to `mydf` now
+```{r}
+saveLoc <- paste(getwd(), "/data/CRANpackages.csv", sep = "")
+mydf <- read.csv(saveLoc, stringsAsFactors = FALSE)
+cran <- tbl_df(mydf)
+```
+
+* opening `dplyr` library and checking the version
+```{r}
+library(dplyr)
+packageVersion("dplyr")
+```
+
+* data frame tbl, `tbl_df()`
+  + The main advantage to using a tbl_df over a regular data frame is the printing.
+    - limits the volume of data that is outputted
+    - highlights `NA` values
+    - only prints as many columns as neatly fit in the console
+```{r}
+cran
+```
+
+* "The dplyr philosophy is to have small functions that each do one thing well." Specifically there are five 'verbs' that cover most fundamental data manipulation tasks:
+  + `select()` - subset columns  
+    - knows it's parameters are not objects, but rather colnames. And will throw a fit if they aren't actually names in the data set
+    - orders output's columns by the order they're passed into the function  
+    - one can also use the `:` operator to refer to a sequence of columns in either ascending or descending order
+    
+```{r}
+select(cran, ip_id, package, country)
+select(cran, r_arch:country) #Ascending  
+select(cran, country:r_arch) #Decending
+select(cran, -time) #all but-
+select(cran, -(X:size)) #omitting a seq of cols
+```
+  
+  + `filter()` - subset rows by `Comparison` logicals (Use `?Comparison` to learn more)
+```{r}
+filter(cran, package == "swirl")
+
+#Multiple parameters are allowed, only all(TRUE) rows will be returned
+filter(cran, r_version == "3.1.1", country == "US")
+
+#Demo of OR conditional
+filter(cran, country == "US" | country == "IN")
+
+#Numerics don't need quote && AND conditionals can just use separate params
+filter(cran, size > 100500, r_os == "linux-gnu")
+
+#Filtering out NAs
+filter(cran, !is.na(r_version))
+```
+  
+  + `arrange()` - orders the rows of a dataset accoring to the values of a particular variable
+```{r}
+#Demonstrate with a subset of cran
+cran2 <- select(cran, size:ip_id)
+arrange(cran2, ip_id)#Order rows by ip_id
+
+#Descending order  
+arrange(cran2, desc(ip_id))
+
+#arrange by multiple variables
+arrange(cran2, package, ip_id) #order of params determines order of arrange
+```
+  
+  + `mutate()`  - create a new variable based on the value of one or more variables in a dataset  
+```{r}
+#Creating a new subset to demo mutate
+cran3 <- select(cran, ip_id, package, size)
+
+mutate(cran3, size_mb = size / 2^20)
+
+#mutate can also use a value that is created within it's own call
+mutate(cran3, size_mb = size / 2^20, size_gb = size_mb / 2^10)
+```
+  
+  + `summarize()`  - collapses the dataset to a single row
+```{r}
+#Demo with average size:
+summarize(cran, avg_bytes = mean(size))
+```
+  
+  
+
+
+
+
+### Grouping and Chaining with dplyr  
+* This assignment will also be using data about CRAN packages  
+```{r}
+saveLoc <- paste(getwd(), "/data/CRANpackages.csv", sep = "")
+mydf <- read.csv(saveLoc, stringsAsFactors = FALSE)
+cran <- tbl_df(mydf)
+```
+
+* The main idea behind grouping data is that you want to break up your dataset into groups of rows based on the values of one or more variables.
+* The `group_by()` function is used for this  
+```{r}
+by_package <- group_by(cran, package)
+by_package
+```
+
+* Now summarizing the mean will be much more informative as it will be grouped by package
+```{r}
+summarize(by_package, mean(size))
+```
+
+* We can make multiple parameters by group in the summarize function
+```{r}
+pack_sum <- summarize(by_package,
+                      count = n(), #Number of observations in the group
+                      unique = n_distinct(ip_id), #Faster equivalent of `length(unique(ip_id))`
+                      countries = n_distinct(country),
+                      avg_bytes = mean(size))
+pack_sum
+
+#Find 99th percentile
+quantile(pack_sum$count, probs = 0.99)
+
+#filter the top 1% of packages
+top_counts <- filter(pack_sum, count > 679)
+top_counts #Only shows 10
+```
+
+* The `View()` function allows us to see all the rows of a `tbl_df` (Should be executed in `RStudio`)  
+```{r}
+#Let's be real, we want that data to be informative to look at
+top_counts_sorted <- arrange(top_counts, desc(count)) 
+#Commented out for knitted document# View(top_counts_sorted)
+```
+
+* *'piping'* (or *'chaining'*)
+```{r}
+#WITHOUT pipes:
+result2 <-
+  arrange(
+    filter(
+      summarize(
+        group_by(cran,
+                 package
+        ),
+        count = n(),
+        unique = n_distinct(ip_id),
+        countries = n_distinct(country),
+        avg_bytes = mean(size)
+      ),
+      countries > 60
+    ),
+    desc(countries),
+    avg_bytes
+  )
+
+print(result2)
+
+#WITH pipes:
+result3 <-
+  cran %>%
+  group_by(package) %>%
+  summarize(count = n(),
+            unique = n_distinct(ip_id),
+            countries = n_distinct(country),
+            avg_bytes = mean(size)
+  ) %>%
+  filter(countries > 60) %>%
+  arrange(desc(countries), avg_bytes)
+
+# Print result to console
+print(result3)
+```
+
+
+
+
+### Tidying Data with dplyr  
+* **[Hadley Wickham's paper on tidy data](http://vita.had.co.nz/papers/tidy-data.pdf)** (You printed this out and read it already)  
+* The first part of this lesson talked about `gather`, however that has `lifecycle:retired` tagged in it. 
+```{r}
+students <- data.frame (grade = as.factor(c("A", "B", "C", "D", "F")),
+                        male = as.integer(c(5,4,8,4,5)),
+                        female = as.integer(c(3,1,6,5,5)))
+students
+#gather(students, sex, count, -grade)
+```
+  +  The data argument, students, gives the name of the original dataset. The key and value arguments -- sex and count, respectively -- give the column names for our tidy dataset. The final argument, -grade, says that we want to gather all columns EXCEPT the grade column
+
+* Ok, so.. all of these functions are being listed as retired. Just read Hadley's paper to understand what kinds of messy data we can get into. It'll be more informative.
+
+## Quiz Scribbles  
+
+1) 
+* *"The American Community Survey distributes downloadable data about United States communities. Download the 2006 microdata survey about housing for the state of Idaho."* **[A code book describing the variable names](https://d396qusza40orc.cloudfront.net/getdata%2Fdata%2FPUMSDataDict06.pdf)**
+```{r}
+url <- "https://d396qusza40orc.cloudfront.net/getdata%2Fdata%2Fss06hid.csv"
+saveLoc <- paste(getwd(), "/data/IdahoHousing06.csv", sep = "")
+download.file(url, saveLoc, "curl")
+housing <- read.csv(saveLoc)
+library(dplyr)
+housing <- tbl_df(housing)
+housing
+```
+
+* *"Create a logical vector that identifies the households on greater than 10 acres who sold more than $10,000 worth of agriculture products. Assign that logical vector to the variable agricultureLogical."* 
+
+Relavent info from the Code Book:
+* ACR:
+  + N/A - (GQ/not a one-family house or mobile home)
+  + 1 - House on less than one acre
+  + 2 - House on one to less than ten acres
+  + 3 - House on ten or more acresAGS 1
+
+* AGS: 
+  + N/A - (less than 1 acre/GQ/vacant/2 or more units in structure)
+  + 1 - None
+  + 2 - $    1 - $  999
+  + 3 - $ 1000 - $ 2499
+  + 4 - $ 2500 - $ 4999
+  + 5 - $ 5000 - $ 9999
+  + 6 - $10000+
+```{r}
+library(dplyr)
+slimHousing <-  housing %>% select(SERIALNO, ACR, AGS) %>%
+mutate(Qualify = ACR == 3 & AGS == 6)
+```
+*"Apply the which() function like this to identify the rows of the data frame where the logical vector is TRUE. What are the first 3 values that result?"* 
+
+```{r}
+which(slimHousing$Qualify)[1:3]
+```
+
+
+
+
+2)
+* *"Using the jpeg package read in the following picture of your instructor into R"*
+```{r}
+url <- "https://d396qusza40orc.cloudfront.net/getdata%2Fjeff.jpg"
+saveLoc <- paste(getwd(), "/data/jeff.jpg", sep = "")
+download.file(url, saveLoc, "curl", mode = "wb") #jpeg is a binary file
+```
+
+* *"Use the parameter native=TRUE. What are the 30th and 80th quantiles of the resulting data?"*
+```{r}
+library(jpeg)
+jeff <- readJPEG(saveLoc, native = TRUE)
+
+# "(some Linux systems may produce an answer 638 different for the 30th quantile)"
+quantile(jeff, probs = c(.3, .8)) 
+```
+
+
+
+
+3)  
+* *"Load the Gross Domestic Product data for the 190 ranked countries in this data set:"*
+```{r}
+url <- "https://d396qusza40orc.cloudfront.net/getdata%2Fdata%2FGDP.csv"
+saveLoc <- paste(getwd(), "/data/GDP.csv", sep = "")
+download.file(url, saveLoc, "curl")
+GDP <- read.csv(saveLoc)
+
+#Cleaning
+GDP <- GDP[5:235,]
+library(dplyr)
+GDP <- GDP %>% rename(CountryCode = X, Ranking = Gross.domestic.product.2012, 
+                      Long.Name = X.2, mil.US.dollars = X.3) %>%
+               select(CountryCode, Long.Name, Ranking, mil.US.dollars) %>%
+               filter(!is.na(Ranking) & Ranking != "")
+```
+
+* *"Load the educational data from this data set"*
+```{r}
+url <- "https://d396qusza40orc.cloudfront.net/getdata%2Fdata%2FEDSTATS_Country.csv"
+saveLoc <- paste(getwd(), "/data/Edu.csv", sep = "")
+download.file(url, saveLoc, "curl")
+edu <- read.csv(saveLoc)
+```
+
+* *"Match the data based on the country shortcode. How many of the IDs match?"*  
+```{r}
+library(dplyr)
+mergedData <- merge(GDP, edu, by = "CountryCode", all = FALSE)
+mergedData
+count(mergedData)
+```
+
+* *"Sort the data frame in descending order by GDP rank (so United States is last). What is the 13th country in the resulting data frame?"*
+
+```{r}
+sortedData <- arrange(mergedData, desc(as.numeric(as.character(Ranking))))
+sortedData[13,]
+```
+
+
+4)  
+* *"What is the average GDP ranking for the "High income: OECD" and "High income: nonOECD" group? "*
+```{r}
+groupedData <- group_by(sortedData, Income.Group)
+summarize(groupedData, mean(as.numeric(as.character(Ranking)), na.rm = TRUE))
+```
+
+5)  
+*"Cut the GDP ranking into 5 separate quantile groups. Make a table versus Income.Group. How many countries are Lower middle income but among the 38 nations with highest GDP?"*
+```{r}
+quantile(as.numeric(as.character(sortedData$Ranking)), probs = c(seq(0.2:1, by=0.2)))
+bestOfTheWorst <- filter(sortedData, 
+                    as.numeric(as.character(Ranking)) <= 38, as.character(Income.Group) == "Lower middle income")
+count(bestOfTheWorst)
+```
+
+
+
+# Text and Date Manipulation in R  
+
+## Editing Text Variables  
+* Using Baltimore automated Speed Cameras data  
+```{r}
+cameraData <- read.csv(paste(getwd(), "/data/cameras.csv", sep = ""))
+names(cameraData)
+```
+
+* `tolower` function (There's also a `toupper` function)
+```{r}
+tolower(names(cameraData))#making all lower case helps reduce your own errors in typing
+```
+
+* Separated character vectors by a token with `strsplit`
+```{r}
+#Have to use `//` when refering to reserved chars
+splitNames <- strsplit(names(cameraData), "\\.")
+splitNames[[6]]
+
+#strsplit returns a list
+splitNames
+```
+
+* Quick aside on lists
+```{r}
+mylist <- list(letters = c("A", "b", "c"), numbers = 1:3, matrix(1:25, ncol = 5))
+head(mylist)
+
+#Returns first list and it's name
+class(mylist[1])
+mylist[1]
+
+
+#Returns vector of given name
+class(mylist$letters)
+mylist$letters
+
+#Returns first vector
+class(mylist[[1]])
+mylist[[1]]
+```
+
+* Fixing character vectors with `sapply`  
+```{r}
+splitNames[[6]][1]
+
+firstElement <- function(x){x[1]}
+sapply(splitNames, firstElement)
+```
+
+* Now using peer review experiment data
+```{r}
+reviews <- read.csv(paste(getwd(), "/data/review.csv", sep =""))
+solutions <- read.csv(paste(getwd(), "/data/solutions.csv", sep =""))
+head(reviews)
+head(solutions)
+```
+
+* Using the `sub()` function  
+  + substitues `pattern` with `replacement` in the given vector, `x` in the first instance
+```{r}
+names(reviews)
+sub("_", "", names(reviews),)
+```
+
+* Using the `gsub()` function to replace all of a certain character
+```{r}
+testName <- "this_is_a_test"
+sub("_", "", testName)
+gsub("_", "", testName)
+```
+
+### Finding specific characters  
+```{r}
+#Looking at subset in range of result
+cameraData$intersection[61:80]
+
+#Search for a particular string withing the vectors
+grep("Alameda", cameraData$intersection)
+
+#Counting how many times a particular string appears
+table(grepl("Alameda", cameraData$intersection))
+
+#Using grepl to subset a certain string to remove
+cameraData2 <- cameraData[!grepl("Alameda", cameraData$intersection),]
+cameraData2[61:80,]
+```
+
+* More on `grep`
+```{r}
+#Return values rather than index
+grep("Alameda", cameraData$intersection, value = TRUE)
+
+#Finding something that doesn't appear
+grep("JeffStreet", cameraData$intersection)
+length(grep("JeffStreet", cameraData$intersection))
+```
+
+* Other useful string functions  
+```{r}
+library(stringr)
+nchar("Jeffrey Leek") #Num of characters
+substr("Jeffrey Leek", 1,7) #Subset part of string (1st to 7th letters)
+paste("Jeffrey", "Leek")#I already use this all the time
+
+#BUT I ALWAYS WASTE MY TIME TYPING: `sep = ""`
+paste0("Jeffrey", "Leek")
+
+#Trim out spaces
+str_trim("Jeff         ")
+```
+
+### Important points about text in data sets  
+* Names of variables should be:  
+  + All lower case when possible
+  + Descriptive (Diagnosis versus Dx)  
+  + Not duplicated  
+  + Not have underscores, dots, or white spaces  
+* Variables with character values:  
+  + Should usually be made into factor variables (depends on application)
+  + Should be descriptive 
+    - use `TRUE`/`FALSE` instead of `0`/`1` and `Male`/`Female` versus either `0`/`1` or `M`/`F`   
+    
+## Regular Expressions 1
+* Regular expressions can be thought of as a combination fo literals and metacharacters  
+* An analogy with natural language: think of literal text forming the words of this language, and the metacharacters as defining its grammer  
+* Regular expressions have a rich set of metacharacters  
+* Simplest pattern consists only of literals, such as a particular word; a match occurs if the sewuence of literals occurs anywhere in the text being tested  
+
+* What if we only want the word "Obama"? Or sentences that end in the word "Clinton", "clinton", or "clinto"?  
+* We need a way to express:
+  + whitespace word boundaries  
+  + sets of literals  
+  + the beginning and end of a line  
+  + alternatives ("war" or"peace") This is where we get the aid of...
+  
+### Metacharacters
+* Some meta characters (`^`) represent the start of a line:
+  + `^i think` will match with the lines:
+    - *i think we all rule for participating*  
+    - *i think i have been outed*  
+    - *i think this will be quite fun actually*  
+    - *i think i need to go to work*  
+    - *i think i first saw zombo in 1999*
+    
+  + However, it will not match if *i think* appears in the middle of the line  
+  
+* `$` represents the end of a line
+  + `morning$` will match with the lines:  
+    - *well they had somethin this morning*  
+    - *then had to catch a tram home in the morning*  
+    - *dog obedience school in the  morning*  
+    - *and yes happy birthday I forgot to say it earlier this morning*  
+    - *I walked in the rain this  morning*  
+    - *good morning*  
+    
+* We can list a set of characters we will accept at a given point in the match  
+  + `[Bb] [Uu] [Ss] [Hh]` will match with the lines: (Any verison of the word *bush*)
+    - The democrats are playing, "Name the worst thing about **Bush**!"  
+    - I smelled the desert creosote **bush**, brownies, BBQ chicken  
+    - BBQ and **bush**walking at Molonglo Gorge  
+    - **Bush** TOLD you that North Korea is part of the Axis of Evil  
+    - I'm listening to **Bush** - Hurricane (Album Version)  
+    
+* Combing these features
+  + `^[Ii] am` will match with:
+    - **i am** so angry at my boyfriend I can't even bear to look at him  
+    - **i am** boycotting the apple sotre  
+    - **I am** twittering from iPhone  
+    - **I am** a very vengeful person when you ruin my sweetheart.  
+    - **I am** so over this. I need food. Mmmm bacon...  
+
+* You can also specify a range of letters [a-z] or [a-zA-Z] for upper or lower case 
+  + notice the order doesn't matter  
+  + So `^[0-9] [a-zA-Z]` will match with:
+    - **7t**h inning stretch  
+    - **2n**d half soon to begin. OSU did just win something  
+    - **3a**m - can't sleep - too hot still.. :(  
+    - **5f**t 7 send from heaven  
+    - **1s**t sign of starvation  
+
+* When used at the beginning of a character class, the `^` is also a metacharacter and indicates matching chracters NOT in the indicated class
+  + `[^?.]$` will match any lines that do NOT end in a `?` or `.` such as:
+    + I like basketballs  
+    + 6 and 9  
+    + don't worry... we all die anyway!  
+    + Not in Baghdad  
+    + helicopter under water? hmmm
+
+
+## Regular Expressions 2: More Metacharacters  
+* The `.` is used to refer to any character.
+  + So `9.11` will match anything with a `9`, any character, then an `11`:  
+    - it's stupid the post **9-11** rules  
+    - if any 1 of us did **9/11** we would have been caught in days.  
+    - NetBios: scanning ip 203.16**9.11**4.66  
+    - Front Door **9:11**:46 AM  
+    - Sings: 01189998819**9911**9725...3 !  
+
+
+* The `|` is used like an "or" operator and can be used to combine two expressions, the subexpressions are called *alternatives*  
+  + So `flood|fire` will match with any line that contains `flood` or `fire`:  
+    - is **fire**wire like usb on none macs?  
+    - the global **flood** makes sense within the context of the bible  
+    - yeah I've ahd the **fire** on tongiht  
+    - ... and the **flood**s, hurricanes, killer heatwaves, readnecks, gun nuts, etc.  
+  + Multiple characters can also be put in one line `flood|earthquake|hurricane|coldfire`
+  
+* The alternatives can be real expressions and not just literals
+  + `^[Gg]ood|[Bb]ad` will match with
+    - **good** to hear some good news from someone here  
+    - **Good** afternoon fellow american infidels!  
+    - **good** on you- what do you drive?  
+    - Katie... guess they had **bad** experiences...  
+    - my middle name is trouble, Miss **Bad** News  
+    
+* As such paratheses should be used if one wish to extend the `^`
+  + `^([Gg]ood|[Bb]ad)` will match:
+    - **bad** habbit  
+    - **bad** coordination today  
+    - **good**, because there is nothing worse...  
+    - **Bad**cop, it's because people want to use drugs  
+    - **Good** Monday Holiday  
+    - **Good** riddance to Limey  
+    
+* The `?` (Question mark) indicates that the indicated expression is optional  
+  + So `[Gg]eorge( [Ww]\.)? [Bb]ush` will match the lines:
+    - I bet I can spell better than you and **george bush** combined  
+    - BBC reported that President **George W. Bush** claimed God told him to invade..
+    - a bird in the hand is worth two **george bush**es
+
+* The `*` and `+` signs are metacharacters used to indicate repetition;
+  + `*` means "any number, including none, of the item"
+  + `+` means "at least one of the item"  
+  + So `(.*)` is searching for some phrase inbetween paratheses
+  + And `[0-9]+ (.*)[0-9]+` will look for any combination of numbers that are separated by something  
+  
+* `{ and }` are refferred to as interval quantifiers; they let us specify the minimum and mzimum number of matches of an expression
+  + So `[Bb]ush( +[^ ]+ +){1,5} debate` will match any line that has *bush* followed by *1 to 5* words then the word *debate*  
+  
+* Numbers
+  + m`,`n means at least m but not more than n matches  
+  + *m* means exactly m matches  
+  + *m,* means at least m matches  
+  
+* In most implementations of regualr expressions, the parentheses not only limit the scope of alternatives divided by a "|", byt also can eb used to "remember" text matched by the subexpression enclsoed  
+  + We refer to the matched text with `\1`, `\2`, etc. (Escaped numbers)
+  + So `+( [a-zA-Z]+) +\1 +` is looking for *a space* `+` *some number of, but at least 1, characters* `+` *a space* `+` *The same set of characters previously seen* `+` *a space*; The following lines will match  
+    - time for bed, **night night** twitter!  
+    - blah **blah blah** blah  
+    - my tattoo is **so so** itchy today  
+    - I was standing **all all** alone against the world outside...  
+    - hi **anybody anybody** at home  
+    - estudiando **css css** css css... que desastritooooo  
+    
+* The `*` is "greedy" so it always matches the *longest* possible string that satisfies the regular expression
+  + So `^s(.*)s` matches with:  
+    - **sitting at starbucks**  
+    - **setting up mysql and rails**  
+    - **studying s**tuff for the exam  
+    - **stop fighting with crackers**  
+    - **sore shoulders are s**tupid  
+    
+  + The "greediness" of `*` can be turned off with the `?` as in: `^s(.*?)s$` which will match with: 
+    - **sitting at s**tarbucks  
+    - **setting up mys**ql and rails  
+    - **studying s**tuff for the exam  
+    - **stop fighting with crackers**  
+    - **sore s**houlders are stupid  
+    
+* Summary
+  + Regular expressions are used in many different languages; not unique to R  
+  + Regular expressions are composed of literals and metacharacters that represent sets or classes of characters/words  
+  + Text processing via regular expressions is a very powerful way to extract data from "unifriendly" sources  
+  + Used with the functions `grep`, `grepl`, `sub`, `gsub` and others that involve searching for text strings
+
+## Working with Dates  
+* Starting simple
+```{r}
+d1 <- date()
+d1
+class(d1)
+```
+
+* Date class  
+```{r}
+d2 <- Sys.Date()
+d2
+class(d2)
+```
+
+### Formatting dates
+* `%d` = day as number (0-31)  
+* `%a` = abbreviated weekday  
+* `%A` = unabbreviated weekday  
+* `%m` = month (00-12)  
+* `%b` = abbreviated month (Jan, Feb, etc.)  
+* `%B` = unabbreviated month (January, Febuary, etc.)  
+* `%y` = two digit year  
+* `%Y` = four digit year  
+```{r}
+d2 <- Sys.Date()
+format(d2, "%a %b %d")
+```
+
+### Creating dates with `as.Date` function  
+```{r}
+x <- c("1jan1960", "2jan1960", "31mar1960", "30jul1960")
+z <- as.Date(x, "%d%b%Y")
+z
+
+#Manipulating these dates
+z[1] - z[2]
+as.numeric(z[1]-z[2])
+```
+
+* Converting to Julian
+```{r}
+d2 <- Sys.Date()
+weekdays(d2, abbreviate = FALSE)
+months(d2, abbreviate = FALSE)
+
+#Reports number of days since an orgin
+julian(d2)
+```
+
+### Lubridate  
+* Another Hadley Wickham package, **[Read more about it here](https://www.r-statistics.com/2012/03/do-more-with-dates-and-times-in-r-with-lubridate-1-1-0/)**  
+
+* Easily converts common standard formats of dates into `Date` class  
+```{r}
+library(lubridate)
+
+ymd("20140108")
+mdy("08/04/2013")
+dmy("03-04-2013")
+```
+
+* Also allows one to deal with times  
+```{r}
+ymd_hms("2011-08-03 10:15:03")
+
+#Including timezones
+ymd_hms("2011-08-03 10:15:03", tz = "Pacific/Auckland")
+
+#Finding your System's tz (kinda)
+Sys.timezone()
+```
+
+* Some functions in `lubridate` have a slightly different syntax  
+```{r}
+x <- dmy(c("1jan2013", "2jan2013", "31mar2013", "30jul2013"))
+
+#Returns a numeric by default
+wday(x[1])
+
+#Returns a "ordered" with a "factor"
+wday(x[1], label=TRUE)
+```
+
+* Ultimately you want your date and times as class "`Date`" or the classes "`POSIXct`" or "`POSIXlt`"
+
+## Data Resources (Where to find cattle)  
+### Open Government Sites  
+* **[United Nations](http://data.un.org/)**  
+* **[U. S.](http://www.data.gov/)**  
+* **[The Nethelands](https://data.overheid.nl/)**
+* **[United Kingsom](http://data.gov.uk/)**  
+* **[France](http://www.data.gouv.fr/)**  
+* **[Ghana](http://data.gov.gh/)**  
+* **[Australia](http://data.gov.au/)**  
+* **[Germany](https://www.govdata.de/)**  
+* **[Hong Kong](http://www.gov.hk/en/theme/psi/datasets)**  
+* **[Japan](http://www.data.go.jp/)**
+* ***[Many more](http://www.data.gov/opendatasites)***  
+
+### Other Sites
+* **[Gapminder](http://www.gapminder.org/)** - Development in human health  
+* **[Survey data from the United States](http://www.asdfree.com/)** - Info on how to access the surveys  
+* **[Infochimps Marketplace](http://www.infochimps.com/marketplace)** - Some are free, some cost money  
+* **[Kaggle](http://www.kaggle.com/)** - Company that offers data science competitions  
+
+### Collections by data scientists  
+* **[Hilary Mason (Dead Link, website provided instead)](https://hilarymason.com/)**
+* **[Peter Skomoroch]()**  
+* **[Jeff Hammerbacher](https://www.quora.com/q/voliiptdhjuscaql)**  
+* **[Gregory Piatetsky-Shapiro](https://www.kdnuggets.com/gps.html)**
+
+
+* **[Many more](https://blog.journeyofanalytics.com/50-free-datasets-for-data-science-projects/)**
+
+### More specialized collections  
+* **[Stanford Large Network Data](http://snap.stanford.edu/data/)**  
+* **[UCI Machine Learning](http://archive.ics.uci.edu/ml/index.php)**  
+* **[KDD Nugets Datasets](https://www.kdnuggets.com/datasets/index.html)**  
+* **[CMU Statlib](http://lib.stat.cmu.edu/datasets/)**  
+* **[Gene expression omnibus](https://www.ncbi.nlm.nih.gov/geo/)**  
+* **[ArXiv Data](https://arxiv.org/help/bulk_data)**  
+* **[Public Data Sets on Amazon Web Services](https://aws.amazon.com/opendata/public-datasets/)**
+
+### Some API's with R interfaces  
+* **[twitter](https://developer.twitter.com/en)** and **[twitteR](https://cran.r-project.org/web/packages/twitteR/index.html)** package  
+* **[figshare](https://docs.figshare.com/)** and **[rfigshare]https://cran.r-project.org/web/packages/rfigshare/index.html)**  
+* **[PLoS](http://api.plos.org/)** and **[rplos](cran.r-project.org/web/packages/rplos/rplos.pdf)**  
+* **[rOpenSci](https://ropensci.org/packages/index.html)**  
+* **[Facebook](https://developers.facebook.com/)** and **[RFacebook](https://cran.r-project.org/web/packages/Rfacebook/)**  
+* **[Google maps](https://cloud.google.com/maps-platform/)** and **[RGoogleMaps](https://cran.r-project.org/web/packages/RgoogleMaps/index.html)**
+
+## Lessons with `swirl()`  
+### Tidying Data with tidyr   
+* This lesson just covered the `lubridate` package
+```{r}
+#Sometimes one needs to be more specific in a call
+ymd("192012")
+ymd("1920-1-2")
+```
+
+* **[Complete list of valid time zones for use with lubridate](http://en.wikipedia.org/wiki/List_of_tz_database_time_zones)**  
+
+* The `with_tz()` function returns a date-time as it would appear in another time zone
+
+#### Me looking at some data on my own
+```{r}
+saveLoc <- paste0(getwd(), "/data/debate_transcripts_v3_2020-02-26.csv")
+trans <- read.csv(saveLoc)
+library(dplyr)
+trans <- mutate(trans, word_count = sapply(sapply(as.character(trans$speech), strsplit, split = " "), length))
+cutoffIndices <- grep("-$", trans$speech)
+trans <- mutate(trans, got_cutoff = FALSE, cutoff_opponet = FALSE)
+trans$got_cutoff[cutoffIndices] <- TRUE
+trans$cutoff_opponet[cutoffIndices+1] <- TRUE
+trans <- group_by(trans, debate_name)
+names(trans)
+```
+
+```{r}
+bernie <- trans %>% filter(as.character(speaker) == "Bernie Sanders")
+biden <- trans %>% filter(as.character(speaker) == "Joe Biden")
+bernie_summary <- summarise(bernie, 
+            speaking_time = sum(speaking_time_seconds), word_count = sum(word_count), 
+            avg_WPM = word_count/(speaking_time/60), 
+            got_cutoff = sum(got_cutoff), cutoff_opponet = sum(cutoff_opponet))
+
+biden_summary <- summarise(biden, 
+            speaking_time = sum(speaking_time_seconds), word_count = sum(word_count), 
+            avg_WPM = word_count/(speaking_time/60),
+            got_cutoff = sum(got_cutoff), cutoff_opponet=sum(cutoff_opponet))
+
+bernie_summary
+biden_summary
+```
+
+
+### Quiz Scribbles  
+
+1)  
+* **The American Community Survey distributes downloadable data about United States communities. Download the 2006 microdata survey about housing for the state of Idaho**  
+```{r}
+url <- "https://d396qusza40orc.cloudfront.net/getdata%2Fdata%2Fss06hid.csv"
+saveLoc <- paste0(getwd(), "/data/Q4IdahoHousing06.csv")
+download.file(url, saveLoc, "curl")
+idaho <- read.csv(saveLoc)
+```
+
+* **Apply strsplit() to split all the names of the data frame on the characters "wgtp". What is the value of the 123 element of the resulting list?**
+```{r}
+strsplit(names(idaho), "wgtp")[123]
+```
+
+
+
+
+2)  
+* **Load the Gross Domestic Product data for the 190 ranked countries**  
+```{r}
+url <- "https://d396qusza40orc.cloudfront.net/getdata%2Fdata%2FGDP.csv"
+saveLoc <- paste0(getwd(), "/data/Q4GDP.csv")
+download.file(url, saveLoc, "curl")
+rawGDP <- read.csv(saveLoc)
+```
+
+* **Remove the commas from the GDP numbers in millions of dollars and average them. What is the average?**
+```{r}
+gdp <- rawGDP[5:length(rawGDP[,1]),]
+gdp <- gdp %>% rename(GDP_Mil_USD = X.3, 
+                LongCountryName = X.2, ShortCountryName = X, Rank = Gross.domestic.product.2012) %>%
+            select(ShortCountryName, Rank, GDP_Mil_USD, LongCountryName) %>%
+            mutate(GDP_Mil_USD = as.numeric(gsub(",", "", GDP_Mil_USD))) %>%
+            filter(as.numeric(as.character(Rank)) > 0)
+mean(gdp$GDP_Mil_USD)
+```
+
+
+
+
+3)  
+* **In the data set from Question 2 what is a regular expression that would allow you to count the number of countries whose name begins with "United"? Assume that the variable with the country names in it is named countryNames. How many countries begin with United? **
+```{r}
+countryNames <- as.character(gdp$LongCountryName)
+length(grep("^United", countryNames))
+```
+
+
+
+
+
+4)  
+* **Load the Gross Domestic Product data for the 190 ranked countries** (Same as Question 2)
+```{r}
+saveLoc <- paste0(getwd(), "/data/Q4GDP.csv")
+rawGDP <- read.csv(saveLoc)
+```
+
+* **Load the educational data**  
+```{r}
+url <- "https://d396qusza40orc.cloudfront.net/getdata%2Fdata%2FEDSTATS_Country.csv"
+saveLoc <- paste0(getwd(), "/data/Q4Edu.csv")
+download.file(url, saveLoc, "curl")
+rawEdu <- read.csv(saveLoc)
+```
+
+* **Match the data based on the country shortcode. Of the countries for which the end of the fiscal year is available, how many end in June?**
+```{r}
+# Clean gdp
+gdp <- rawGDP[5:length(rawGDP[,1]),]
+gdp <- gdp %>% rename(GDP_Mil_USD = X.3, 
+                Long.Name = X.2, CountryCode = X, Rank = Gross.domestic.product.2012) %>%
+            select(CountryCode, Rank, GDP_Mil_USD, Long.Name) %>%
+            mutate(GDP_Mil_USD = as.numeric(gsub(",", "", GDP_Mil_USD))) %>%
+            filter(!is.na(CountryCode))
+
+# Merge
+combinedData <- merge(gdp, rawEdu, by = "CountryCode", all = FALSE)
+combinedData <- rename(combinedData, Long.Name = Long.Name.y)
+
+
+#Only need end of the fiscal year in june info
+condencedData <- combinedData %>% select(Rank, CountryCode, Long.Name, Special.Notes, GDP_Mil_USD)
+qualifyingData <- condencedData[grep("^Fiscal year end: June", condencedData$Special.Notes),]
+qualifyingData
+```
+
+
+
+
+
+5)  
+* **You can use the** ***[quantmod package](http://www.quantmod.com/)*** **to get historical stock prices for publicly traded companies on the NASDAQ and NYSE. Use the following code to download data on Amazon's stock price and get the times the data was sampled.**  
+(Following code was given in the question)
+```{r}
+library(quantmod)
+amzn = getSymbols("AMZN",auto.assign=FALSE)
+sampleTimes = index(amzn)
+```
+
+* **How many values were collected in 2012?**
+```{r}
+library(lubridate)
+qualify <- (sampleTimes >= ymd("2012-01-01") & sampleTimes < ymd("2013-01-01"))
+qualifyingDates <- sampleTimes[qualify]
+length(qualifyingDates)
+```
+
+* **How many values were collected on Mondays in 2012?**  
+```{r}
+sum(wday(qualifyingDates)==2)
+```
